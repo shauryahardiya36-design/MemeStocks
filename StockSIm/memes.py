@@ -106,7 +106,7 @@ def update_market_logic():
     return market, is_emergency, is_bull
 
 # --- 4. UI SETUP ---
-st.set_page_config(page_title="Shaurya Terminal", layout="wide")
+st.set_page_config(page_title="Memeconomy Trading Platform", layout="wide")
 market_state, is_emergency, is_bull = update_market_logic()
 prices = market_state["prices"]
 users = load_json(USER_FILE, {})
@@ -200,11 +200,7 @@ else:
                 save_json(USER_FILE, users)
                 st.toast(f"Tax levied on {target}")
             
-            # Ghost/Kitten Toggles
-            c1, c2 = st.columns(2)
-            if c1.button("Ghost User"): users[target]["is_ghosted"] = not users[target]["is_ghosted"]
-            if c2.button("Label Kitten"): users[target]["is_kitten"] = not users[target]["is_kitten"]
-            save_json(USER_FILE, users)
+    
 
     # 8. TRADING
     st.sidebar.divider()
