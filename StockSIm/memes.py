@@ -5,146 +5,158 @@ import pandas as pd
 import numpy as np
 import time
 import random
+from datetime import datetime, timedelta
 
-# --- 1. MARKET ARCHITECTURE ---
-# Shaurya Inc = Nvidia | Sunny AI = Google | GCBROS = Microsoft
-STARTING_CONFIG = {
-    "Shaurya Inc": {"price": 100.0, "proxy": "Nvidia", "base_cap": 1000000.0},
-    "Sunny AI": {"price": 150.0, "proxy": "Google", "base_cap": 1000000.0},
-    "GCBROS": {"price": 50.0, "proxy": "Microsoft", "base_cap": 1000000.0}
+# --- 1. CONFIGURATION & CORE DATA ---
+# Shaurya Inc (NVDA) | Sunny AI (GOOGL) | GCBROS (MSFT)
+TICKERS = {
+    "Shaurya Inc": {"p_start": 100.0, "proxy": "Nvidia", "cap_start": 1000000.0},
+    "Sunny AI": {"p_start": 150.0, "proxy": "Google", "cap_start": 1000000.0},
+    "GCBROS": {"p_start": 50.0, "proxy": "Microsoft", "cap_start": 1000000.0}
 }
 
 NEWS_POOL = [
-    "💎 Shaurya Inc. facilitates the trade of a 1-of-1 'Golden Screenshot' for $1.2M.",
-    "🚨 GCBROS CEO doubles down on controversial statements; market volatility spikes.",
-    "🎨 Sunny AI releases 'Candid GCBROS' photo pack; parody images go viral globally.",
-    "📦 Shaurya Inc. digitizes 4 petabytes of vintage group chat logs into the 'Vault'.",
-    "🎥 Sunny AI's new generator creates a 'Deepfake Shaurya' so real it confused the board.",
-    "⚠️ GCBROS platform restricted in 3 countries after 'unfiltered' midnight rant.",
-    "🚀 Shaurya Inc (NVDA) inventory surge: 50,000 rare screenshots moved to cold storage."
+    "💎 Shaurya Inc. secures a 'Legendary Holo' screenshot; meme liquidity hits $5M.",
+    "🚨 GCBROS CEO issues a controversial late-night statement; volatility triples.",
+    "🎨 Sunny AI releases a 'Deepfake GCBROS' video; parity traffic crashes servers.",
+    "🚀 Shaurya Inc (NVDA) announces a 'Meme Dividend' for long-term holders.",
+    "⚠️ GCBROS platform restricted in 5 regions following 'unfiltered' board meeting leak.",
+    "🤖 Sunny AI's new generator creates a 'Boss Shaurya' AI avatar for the terminal."
 ]
 
-# --- 2. DATA UTILITIES ---
-def load_users():
-    if os.path.exists("users.json"):
-        with open("users.json", "r") as f: return json.load(f)
-    return {}
+# --- 2. DATA PERSISTENCE ---
+def load_json(filename, default):
+    if os.path.exists(filename):
+        with open(filename, "r") as f: return json.load(f)
+    return default
 
-def save_users(users):
-    with open("users.json", "w") as f: json.dump(users, f, indent=4)
+def save_json(filename, data):
+    with open(filename, "w") as f: json.dump(data, f, indent=4)
 
-# --- 3. UI INITIALIZATION ---
-st.set_page_config(page_title="Shaurya Terminal", layout="wide", initial_sidebar_state="expanded")
+# --- 3. PAGE SETUP & UI ---
+st.set_page_config(page_title="Shaurya Executive Terminal", layout="wide")
 
-# Custom CSS for a professional "Dark Bloom" look
+# Dark-Mode Professional Styling
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stMetric { background-color: #1a1c24; padding: 15px; border-radius: 10px; border: 1px solid #2d2f39; }
-    .stInfo { background-color: #002b36; border-left: 5px solid #268bd2; }
+    .stMetric { background-color: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 10px; }
+    .stInfo { background-color: #0d1117; border-left: 5px solid #238636; }
+    .stHeader { font-family: 'Courier New', Courier, monospace; color: #58a6ff; }
     </style>
     """, unsafe_allow_html=True)
 
-if 'market_data' not in st.session_state:
-    st.session_state.market_data = {
-        name: {
-            "price": info["price"],
-            "cap": info["base_cap"],
-            "proxy": info["proxy"]
-        } for name, info in STARTING_CONFIG.items()
-    }
-    st.session_state.history = pd.DataFrame([{t: STARTING_CONFIG[t]["price"] for t in STARTING_CONFIG}])
-    st.session_state.current_news = "SYSTEM ONLINE: Market initialized at $1.00M Cap per sector."
+# Initialize Session State
+if 'market' not in st.session_state:
+    st.session_state.market = {n: {"p": v["p_start"], "c": v["cap_start"]} for n, v in TICKERS.items()}
+    st.session_state.history = pd.DataFrame([{t: v["p_start"] for t, v in TICKERS.items()}])
+    st.session_state.news = "TERMINAL ONLINE: Awaiting Executive Orders from Mr. Shaurya Hardiya."
+    st.session_state.cooldowns = load_json("cooldowns.json", {t: 0 for t in TICKERS})
 
-# --- 4. THE LIVE ENGINE ---
-# This placeholder allows us to refresh the UI without a full page reload
-placeholder = st.empty()
+# --- 4. THE REAL-TIME ENGINE ---
+main_placeholder = st.empty()
 
 while True:
-    with placeholder.container():
-        st.markdown("### 🏛️ SHAURYA INC. GLOBAL REAL-TIME TERMINAL")
+    with main_placeholder.container():
+        st.markdown("<h1 class='stHeader'>🏛️ SHAURYA INC. GLOBAL EXECUTIVE TERMINAL</h1>", unsafe_allow_html=True)
         
-        # Professional News Ribbon
-        st.info(f"🛰️ **WIRE:** {st.session_state.current_news}")
+        # Professional News Ticker
+        st.info(f"🛰️ **WIRE:** {st.session_state.news}")
         
-        # 5. LIVE MARKET METRICS
+        # 5. MARKET TICKER ROW
         m_cols = st.columns(3)
-        for i, (name, data) in enumerate(st.session_state.market_data.items()):
-            # Calculate smooth drift (0.1% to 0.5% max)
-            move = np.random.normal(0.0001, 0.0008)
-            data["price"] *= (1 + move)
+        for i, (name, config) in enumerate(TICKERS.items()):
+            # Natural Drift (Random Walk)
+            drift = np.random.normal(0.0001, 0.0006)
+            st.session_state.market[name]["p"] *= (1 + drift)
             
-            # MATH: Cap scales with price relative to the $1M start
-            original_p = STARTING_CONFIG[name]["price"]
-            data["cap"] = (data["price"] / original_p) * 1000000.0
+            # MATH: Market Cap is scaled proportionally from the $1M start
+            # (Current Price / Starting Price) * $1,000,000
+            st.session_state.market[name]["c"] = (st.session_state.market[name]["p"] / config["p_start"]) * 1000000.0
             
             with m_cols[i]:
-                st.metric(label=f"{name} ({data['proxy']})", 
-                          value=f"${data['price']:.2f}", 
-                          delta=f"{move*100:.3f}%")
-                st.write(f"Valuation: **${data['cap']:,.2f}**")
+                st.metric(label=f"{name} ({config['proxy']})", 
+                          value=f"${st.session_state.market[name]['p']:.2f}", 
+                          delta=f"{drift*100:.3f}%")
+                st.caption(f"Market Cap: **${st.session_state.market[name]['c']:,.2f}**")
 
-        # 6. PERFORMANCE CHART
-        new_row = {t: st.session_state.market_data[t]["price"] for t in STARTING_CONFIG}
+        # 6. LIVE PERFORMANCE CHART
+        new_row = {t: st.session_state.market[t]["p"] for t in TICKERS}
         st.session_state.history = pd.concat([st.session_state.history, pd.DataFrame([new_row])], ignore_index=True).iloc[-50:]
-        st.line_chart(st.session_state.history, height=250)
+        st.line_chart(st.session_state.history, height=300)
 
-        # 7. SIDEBAR: ACCOUNT & SECURE TRADING
-        st.sidebar.title("💳 TRADER AUTH")
-        users = load_users()
+        # 7. SIDEBAR: ACCOUNT & ADMIN POWERS
+        st.sidebar.title("🔐 ACCESS CONTROL")
         
+        # --- ADMIN PANEL: MR. SHAURYA HARDIYA ---
+        with st.sidebar.expander("👑 EXECUTIVE OVERRIDE"):
+            admin_pass = st.text_input("Enter Admin Key", type="password")
+            if admin_pass == "SHAURYA_BOSS":
+                st.success("Authorized: Mr. Shaurya Hardiya")
+                target = st.selectbox("Target Company", list(TICKERS.keys()))
+                
+                # Cooldown Check (7 Days)
+                last_ts = st.session_state.cooldowns.get(target, 0)
+                last_used = datetime.fromtimestamp(last_ts)
+                ready_date = last_used + timedelta(days=7)
+                
+                if datetime.now() > ready_date:
+                    shift = st.select_slider("Select Market Shock", options=[-0.30, -0.15, 0.15, 0.30])
+                    if st.button("EXECUTE SHOCK"):
+                        st.session_state.market[target]["p"] *= (1 + shift)
+                        st.session_state.cooldowns[target] = datetime.now().timestamp()
+                        save_json("cooldowns.json", st.session_state.cooldowns)
+                        st.session_state.news = f"⚠️ EXECUTIVE SHOCK: {target} price shifted by {shift*100}% by order of Mr. Shaurya Hardiya."
+                        st.rerun()
+                else:
+                    st.warning(f"Power Locked for {target}. Ready on {ready_date.strftime('%Y-%m-%d')}")
+
+        # --- TRADER LOGIN ---
+        st.sidebar.divider()
+        users = load_json("users.json", {})
         if 'user' not in st.session_state:
-            user_id = st.sidebar.text_input("Enter Trader ID", placeholder="Username...")
-            if st.sidebar.button("Establish Connection"):
-                if user_id:
-                    if user_id not in users:
-                        users[user_id] = {"balance": 100000.0, "portfolio": {t: 0 for t in STARTING_CONFIG}}
-                        save_users(users)
-                    st.session_state.user = user_id
-                    st.rerun()
+            u_id = st.sidebar.text_input("Trader ID")
+            if st.sidebar.button("Login"):
+                if u_id not in users:
+                    users[u_id] = {"bal": 100000.0, "port": {t: 0 for t in TICKERS}}
+                    save_json("users.json", users)
+                st.session_state.user = u_id
+                st.rerun()
         else:
             u = users[st.session_state.user]
-            st.sidebar.success(f"ONLINE: {st.session_state.user}")
-            st.sidebar.metric("Available Cash", f"${u['balance']:,.2f}")
+            st.sidebar.write(f"Logged in as: **{st.session_state.user}**")
+            st.sidebar.metric("Balance", f"${u['bal']:,.2f}")
             
-            st.sidebar.divider()
-            st.sidebar.subheader("⚡ Execute Order")
+            # --- TRANSACTION ENGINE ---
+            st.sidebar.subheader("⚡ Order Book")
+            trade_tgt = st.sidebar.selectbox("Asset", list(TICKERS.keys()), key="trade_asset")
+            price_now = st.session_state.market[trade_tgt]["p"]
+            owned = u["port"].get(trade_tgt, 0)
             
-            tgt = st.sidebar.selectbox("Select Asset", list(STARTING_CONFIG.keys()))
-            curr_price = st.session_state.market_data[tgt]["price"]
-            owned = u["portfolio"].get(tgt, 0)
+            st.sidebar.write(f"Owned: `{owned}` shares")
+            qty = st.sidebar.number_input("Shares", min_value=0, step=1)
             
-            st.sidebar.write(f"Currently Held: `{owned}` shares")
-            
-            # Transaction Inputs
-            amt = st.sidebar.number_input("Quantity", min_value=0, step=1)
-            
-            btn_buy, btn_sell = st.sidebar.columns(2)
-            
-            if btn_buy.button("BUY", use_container_width=True):
-                cost = amt * curr_price
-                if u["balance"] >= cost and amt > 0:
-                    u["balance"] -= cost
-                    u["portfolio"][tgt] += amt
-                    save_users(users)
-                    st.toast(f"Purchased {amt} shares of {tgt}")
-                else:
-                    st.sidebar.error("Insufficient Funds")
+            b_col, s_col = st.sidebar.columns(2)
+            if b_col.button("BUY", use_container_width=True):
+                if u["bal"] >= (qty * price_now) and qty > 0:
+                    u["bal"] -= (qty * price_now)
+                    u["port"][trade_tgt] += qty
+                    save_json("users.json", users)
+                    st.toast(f"Purchased {qty} {trade_tgt}")
+                else: st.sidebar.error("Funds Low")
 
-            # FIXED EXPLOIT: Check if shares owned >= shares being sold
-            if btn_sell.button("SELL", use_container_width=True):
-                if owned >= amt and amt > 0:
-                    u["balance"] += (amt * curr_price)
-                    u["portfolio"][tgt] -= amt
-                    save_users(users)
-                    st.toast(f"Liquidated {amt} shares of {tgt}")
-                else:
-                    st.sidebar.error(f"❌ Exploit Blocked: You only have {owned} shares.")
+            if s_col.button("SELL", use_container_width=True):
+                # EXPLOIT GUARD: Must own the shares
+                if owned >= qty and qty > 0:
+                    u["bal"] += (qty * price_now)
+                    u["port"][trade_tgt] -= qty
+                    save_json("users.json", users)
+                    st.toast(f"Sold {qty} {trade_tgt}")
+                else: st.sidebar.error("Exploit Blocked")
 
-        # 8. BACKGROUND UPDATES
-        if random.random() < 0.15: # 15% chance to rotate news every tick
-            st.session_state.current_news = random.choice(NEWS_POOL)
-        
-        # SLEEP FOR 30 SECONDS
+        # Cycle news 15% of the time
+        if random.random() < 0.15:
+            st.session_state.news = random.choice(NEWS_POOL)
+
+        # THE PULSE: 30-second delay
         time.sleep(30)
         st.rerun()
