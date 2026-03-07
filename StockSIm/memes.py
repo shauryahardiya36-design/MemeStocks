@@ -124,7 +124,7 @@ while True:
         else:
             u = users[st.session_state.user]
             st.sidebar.write(f"Logged in as: **{st.session_state.user}**")
-            st.sidebar.metric("Balance", f"${u['bal']:,.2f}")
+            st.sidebar.metric("Balance", f"${u['balance']:,.2f}")
             
             # --- TRANSACTION ENGINE ---
             st.sidebar.subheader("⚡ Order Book")
