@@ -5,24 +5,37 @@ import pandas as pd
 import numpy as np
 import time
 import random
+from datetime import datetime
 
 # --- 1. CONFIGURATION ---
 MARKET_FILE = "market_state.json"
 USER_FILE = "users.json"
 STARTING_CONFIG = {
-    "Shaurya Inc": {"price": 100.0, "proxy": "Nvidia", "base_cap": 1000000.0},
-    "Sunny AI": {"price": 150.0, "proxy": "Google", "base_cap": 1000000.0},
-    "GCBROS": {"price": 50.0, "proxy": "Microsoft", "base_cap": 1000000.0}
+    "Shaurya Inc": {"price": 100.0, "proxy": "Nvidia"},
+    "Sunny AI": {"price": 150.0, "proxy": "Google"},
+    "GCBROS": {"price": 50.0, "proxy": "Microsoft"}
 }
 
+# --- 2. THE 100-EVENT GC NEWS POOL ---
 NEWS_POOL = [
-    {"text": "💎 Shaurya Inc. facilitates a 1-of-1 'Golden Screenshot' trade for $1.2M.", "impact": {"Shaurya Inc": 0.02}},
-    {"text": "🚨 GCBROS CEO controversy causes market ripples.", "impact": {"GCBROS": -0.03}},
-    {"text": "🎨 Sunny AI parody images of GCBROS go viral.", "impact": {"Sunny AI": 0.015, "GCBROS": -0.01}},
-    {"text": "🚀 Shaurya Inc (NVDA) inventory surge reported.", "impact": {"Shaurya Inc": 0.03}}
+    {"text": "📦 Shaurya Inc. digitizes 4 petabytes of vintage 2021 chat logs into 'The Vault'.", "impact": {"Shaurya Inc": 0.03}},
+    {"text": "💎 Shaurya Inc. facilitates the trade of a 1-of-1 'Golden Screenshot' for $1.2M.", "impact": {"Shaurya Inc": 0.025}},
+    {"text": "🛡️ Shaurya Inc. successfully blocks a GCBROS 'Leak' attempt; market confidence up.", "impact": {"Shaurya Inc": 0.02}},
+    {"text": "🎥 Sunny AI's new generator creates a 'Deepfake Shaurya' so real it confused the board.", "impact": {"Sunny AI": 0.04, "Shaurya Inc": -0.01}},
+    {"text": "🎨 Sunny AI releases 'Candid GCBROS' photo pack; parody images go viral.", "impact": {"Sunny AI": 0.035, "GCBROS": -0.02}},
+    {"text": "🚨 GCBROS CEO doubles down on controversial statements; volatility spikes.", "impact": {"GCBROS": 0.05}},
+    {"text": "📸 GCBROS drops a 'Nuke': A high-definition screenshot from the 2022 era.", "impact": {"GCBROS": 0.04}},
+    {"text": "🤝 SHAURYA-SUNNY ALLIANCE: The giants join forces to erase GCBROS' history.", "impact": {"Shaurya Inc": 0.04, "Sunny AI": 0.04, "GCBROS": -0.07}},
+    {"text": "⚔️ CORPORAL WAR: Shaurya Inc. sues Sunny AI for 'Unlicensed Meme Reproduction'.", "impact": {"Shaurya Inc": -0.02, "Sunny AI": -0.02}},
+    {"text": "☢️ TRI-WAR: GCBROS releases AI screenshots of Shaurya and Sunny arguing.", "impact": {"GCBROS": 0.03, "Shaurya Inc": -0.02, "Sunny AI": -0.02}},
+    {"text": "💩 GCBROS accidentally leaks his own search history in a screenshot.", "impact": {"GCBROS": -0.08}},
+    {"text": "💬 GCBROS sends 400 messages in 2 minutes; chat platform crashes.", "impact": {"GCBROS": 0.03}}
+] + [
+    {"text": f"📡 GC Insider: {random.choice(['Shaurya Inc', 'Sunny AI', 'GCBROS'])} {random.choice(['is winning the roast battle', 'posted a cringe sticker', 'is leaking receipts'])}.", 
+     "impact": {random.choice(["Shaurya Inc", "Sunny AI", "GCBROS"]): random.uniform(-0.02, 0.02)}} for i in range(88)
 ]
 
-# --- 2. SHARED DATA UTILITIES ---
+# --- 3. SHARED DATA ENGINE ---
 def load_json(file, default):
     if os.path.exists(file):
         try:
@@ -35,83 +48,82 @@ def save_json(file, data):
         json.dump(data, f, indent=4)
 
 def get_synced_market():
-    """Syncs market prices across all users using a shared JSON file."""
     market = load_json(MARKET_FILE, {
         "prices": {n: STARTING_CONFIG[n]["price"] for n in STARTING_CONFIG},
         "history": [],
         "news": {"text": "SYSTEM ONLINE", "impact": {}},
-        "last_update": 0
+        "last_update": 0,
+        "emergency_active_until": 0,
+        "emergency_last_used": 0
     })
     
     now = time.time()
-    # Only update prices if 10 seconds have passed globally
+    is_emergency = now < market.get("emergency_active_until", 0)
+
     if now - market["last_update"] >= 10:
         current_impacts = market["news"].get("impact", {})
-        
         for name in market["prices"]:
             boost = current_impacts.get(name, 0)
-            move = np.random.normal(0.0001 + boost, 0.001)
+            # Volatility is higher during Emergency
+            vol = 0.003 if is_emergency else 0.0015
+            move = np.random.normal(0.0001 + boost, vol)
             market["prices"][name] *= (1 + move)
-        
-        # Log history
+            
         market["history"].append(market["prices"].copy())
         if len(market["history"]) > 50: market["history"].pop(0)
         
-        # Update News
-        if random.random() < 0.20:
-            market["news"] = random.choice(NEWS_POOL)
+        if random.random() < 0.30:
+            if is_emergency:
+                market["news"] = {"text": "🚨 EMERGENCY: HARDIYA PROTOCOL ACTIVE. MARKET IN FREEFALL.", "impact": {}}
+            else:
+                market["news"] = random.choice(NEWS_POOL)
         else:
-            market["news"]["impact"] = {k: v*0.5 for k, v in market["news"].get("impact", {}).items()}
+            market["news"]["impact"] = {k: v*0.7 for k, v in market["news"].get("impact", {}).items()}
             
         market["last_update"] = now
         save_json(MARKET_FILE, market)
     
-    return market
+    return market, is_emergency
 
-# --- 3. UI INITIALIZATION ---
+# --- 4. UI SETUP ---
 st.set_page_config(page_title="Shaurya Terminal", layout="wide")
+market_state, is_emergency = get_synced_market()
+prices = market_state["prices"]
+
+if is_emergency:
+    st.markdown("<style>.stApp { background-color: #2b0505; }</style>", unsafe_allow_html=True)
+
 st.markdown("""<style>
-    .main { background-color: #0e1117; }
     .stMetric { background-color: #1a1c24; padding: 15px; border-radius: 10px; border: 1px solid #2d2f39; }
     .stInfo { background-color: #002b36; border-left: 5px solid #268bd2; font-family: monospace; }
 </style>""", unsafe_allow_html=True)
 
-# 4. FETCH GLOBAL DATA
-market_state = get_synced_market()
-prices = market_state["prices"]
-
 # --- 5. MAIN TERMINAL ---
-st.markdown("### 🏛️ SHAURYA INC. GLOBAL REAL-TIME TERMINAL")
+st.markdown(f"### 🏛️ SHAURYA INC. GLOBAL TERMINAL {'🔴 EMERGENCY ACTIVE' if is_emergency else '🟢 SYSTEM ONLINE'}")
 st.info(f"🛰️ **WIRE:** {market_state['news']['text']}")
 
 m_cols = st.columns(3)
 for i, name in enumerate(prices):
     with m_cols[i]:
-        # Calculate Delta from history
         delta_pct = 0
         if len(market_state["history"]) > 1:
             prev = market_state["history"][-2][name]
             delta_pct = ((prices[name] - prev) / prev) * 100
-            
-        st.metric(label=f"{name} ({STARTING_CONFIG[name]['proxy']})", 
-                  value=f"${prices[name]:,.2f}", 
-                  delta=f"{delta_pct:.3f}%")
         
+        st.metric(label=name, value=f"${prices[name]:,.2f}", delta=f"{delta_pct:.3f}%")
         original_p = STARTING_CONFIG[name]["price"]
         cap = (prices[name] / original_p) * 1000000.0
         st.write(f"Valuation: **${cap:,.2f}**")
 
-# Charting
-if market_state["history"]:
-    st.line_chart(pd.DataFrame(market_state["history"]), height=300)
+st.line_chart(pd.DataFrame(market_state["history"]), height=300)
 
-# --- 6. SIDEBAR: PERSONAL ACCOUNT ---
+# --- 6. SIDEBAR: ACCOUNT & GOD MODE ---
 st.sidebar.title("💳 TRADER AUTH")
 users = load_json(USER_FILE, {})
 
 if 'user' not in st.session_state:
-    user_id = st.sidebar.text_input("Trader ID", placeholder="Enter Username...")
-    if st.sidebar.button("Connect"):
+    user_id = st.sidebar.text_input("Trader ID", placeholder="Username...")
+    if st.sidebar.button("Establish Connection"):
         if user_id:
             if user_id not in users:
                 users[user_id] = {"balance": 100000.0, "portfolio": {n: 0 for n in STARTING_CONFIG}}
@@ -120,15 +132,43 @@ if 'user' not in st.session_state:
             st.rerun()
 else:
     u = users[st.session_state.user]
-    port_val = sum(u["portfolio"][n] * prices[n] for n in STARTING_CONFIG)
-    net_worth = u["balance"] + port_val
+    net_worth = u["balance"] + sum(u["portfolio"][n] * prices[n] for n in STARTING_CONFIG)
     
     st.sidebar.success(f"ONLINE: {st.session_state.user}")
     st.sidebar.metric("Net Worth", f"${net_worth:,.2f}", delta=f"{(net_worth - 100000):,.2f}")
     st.sidebar.write(f"Cash: `${u['balance']:,.2f}`")
-    
+
+    # --- GOD MODE: MR. SHAURYA HARDIYA ---
+    if st.session_state.user == "Mr. Shaurya Hardiya":
+        st.sidebar.divider()
+        st.sidebar.subheader("👑 ADMIN PANEL")
+        
+        last_used_ts = market_state.get("emergency_last_used", 0)
+        last_date = datetime.fromtimestamp(last_used_ts)
+        now_date = datetime.now()
+        
+        can_use = (now_date.month != last_date.month) or (now_date.year != last_date.year)
+        
+        if is_emergency:
+            end_time = datetime.fromtimestamp(market_state["emergency_active_until"]).strftime('%H:%M:%S')
+            st.sidebar.warning(f"EMERGENCY ACTIVE UNTIL {end_time}")
+        elif can_use:
+            if st.sidebar.button("🚨 TRIGGER EMERGENCY", use_container_width=True):
+                # Apply the massive drop
+                for name in market_state["prices"]:
+                    drop = 0.80 if name == "Shaurya Inc" else 0.60
+                    market_state["prices"][name] *= drop
+                
+                market_state["emergency_active_until"] = time.time() + (4 * 86400)
+                market_state["emergency_last_used"] = time.time()
+                save_json(MARKET_FILE, market_state)
+                st.rerun()
+        else:
+            st.sidebar.info("EMERGENCY COOLDOWN: 1 USE PER MONTH")
+
+    # --- TRADING UI ---
     st.sidebar.divider()
-    tgt = st.sidebar.selectbox("Select Asset", list(STARTING_CONFIG.keys()))
+    tgt = st.sidebar.selectbox("Execute Order", list(STARTING_CONFIG.keys()))
     amt = st.sidebar.number_input("Quantity", min_value=0, step=1)
     
     b, s = st.sidebar.columns(2)
@@ -138,19 +178,14 @@ else:
             u["balance"] -= cost
             u["portfolio"][tgt] += amt
             save_json(USER_FILE, users)
-            st.toast(f"Purchased {amt} of {tgt}")
             st.rerun()
-        else: st.sidebar.error("Insufficient Funds")
-
     if s.button("SELL", use_container_width=True):
-        if u["portfolio"][tgt] >= amt and amt > 0:
+        if u["portfolio"].get(tgt, 0) >= amt and amt > 0:
             u["balance"] += (amt * prices[tgt])
             u["portfolio"][tgt] -= amt
             save_json(USER_FILE, users)
-            st.toast(f"Liquidated {amt} of {tgt}")
             st.rerun()
-        else: st.sidebar.error("Insufficient Shares")
 
-# 7. REFRESH
+# --- 7. AUTO-REFRESH ---
 time.sleep(10)
 st.rerun()
