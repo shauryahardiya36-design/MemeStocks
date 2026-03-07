@@ -117,7 +117,7 @@ elif is_bull: st.markdown("<style>.stApp { background-color: #051a05; }</style>"
 
 # --- 5. MAIN DASHBOARD ---
 status_txt = "🔴 EMERGENCY" if is_emergency else ("🚀 BULL RUN" if is_bull else "🟢 ONLINE")
-st.title(f"🏛️ SHAURYA TERMINAL - {status_txt}")
+st.title(f"🏛️ Memeconomy Trading Platform - {status_txt}")
 st.info(f"🛰️ **WIRE:** {market_state['news']['text']}")
 
 cols = st.columns(3)
@@ -229,16 +229,6 @@ else:
         del st.session_state.user
         st.rerun()
 
-# --- 9. LEADERBOARD ---
-st.divider()
-st.subheader("🏆 Leaderboard")
-leaders = []
-for uid, d in users.items():
-    if uid == ADMIN_USER: continue
-    nw = d["balance"] + sum(d["portfolio"].get(n, 0) * prices[n] for n in STARTING_CONFIG)
-    leaders.append({"Trader": uid, "Net Worth": nw, "Status": "🐱" if d.get("is_kitten") else "💼"})
-
-st.dataframe(pd.DataFrame(leaders).sort_values("Net Worth", ascending=False), use_container_width=True, hide_index=True)
 
 # --- 10. REFRESH ---
 time.sleep(10)
