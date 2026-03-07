@@ -72,7 +72,7 @@ market_state, is_emergency = update_market_logic()
 prices = market_state["prices"]
 
 # --- 4. MAIN DASHBOARD ---
-st.title(f"🏛️ SHAURYA TERMINAL {'[RED ALERT]' if is_emergency else ''}")
+st.title(f"🏛️ MEMECONOMY TRADING PLATFORM {'[RED ALERT]' if is_emergency else ''}")
 st.info(f"🛰️ **WIRE:** {market_state['news']['text']}")
 
 cols = st.columns(3)
