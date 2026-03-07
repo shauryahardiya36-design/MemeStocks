@@ -10,6 +10,9 @@ from datetime import datetime
 # --- 1. CONFIGURATION ---
 MARKET_FILE = "market_state.json"
 USER_FILE = "users.json"
+ADMIN_USER = "Mr. Shaurya Hardiya"
+ADMIN_PASS = "ShauryaBoomBoom"
+
 STARTING_CONFIG = {
     "Shaurya Inc": {"price": 100.0, "proxy": "Nvidia"},
     "Sunny AI": {"price": 150.0, "proxy": "Google"},
@@ -20,9 +23,9 @@ STARTING_CONFIG = {
 NEWS_POOL = [
     {"text": "📦 Shaurya Inc. digitizes 4 petabytes of vintage 2021 chat logs into 'The Vault'.", "impact": {"Shaurya Inc": 0.03}},
     {"text": "💎 Shaurya Inc. facilitates the trade of a 1-of-1 'Golden Screenshot' for $1.2M.", "impact": {"Shaurya Inc": 0.025}},
-    {"text": "🛡️ Shaurya Inc. successfully blocks a GCBROS 'Leak' attempt; market confidence up.", "impact": {"Shaurya Inc": 0.02}},
-    {"text": "🎥 Sunny AI's new generator creates a 'Deepfake Shaurya' so real it confused the board.", "impact": {"Sunny AI": 0.04, "Shaurya Inc": -0.01}},
-    {"text": "🎨 Sunny AI releases 'Candid GCBROS' photo pack; parody images go viral.", "impact": {"Sunny AI": 0.035, "GCBROS": -0.02}},
+    {"text": "🛡️ Shaurya Inc. successfully blocks a GCBROS 'Leak' attempt.", "impact": {"Shaurya Inc": 0.02}},
+    {"text": "🎥 Sunny AI's generator creates a 'Deepfake Shaurya' that fooled the board.", "impact": {"Sunny AI": 0.04, "Shaurya Inc": -0.01}},
+    {"text": "🎨 Sunny AI releases 'Candid GCBROS' photo pack; viral parody boost.", "impact": {"Sunny AI": 0.035, "GCBROS": -0.02}},
     {"text": "🚨 GCBROS CEO doubles down on controversial statements; volatility spikes.", "impact": {"GCBROS": 0.05}},
     {"text": "📸 GCBROS drops a 'Nuke': A high-definition screenshot from the 2022 era.", "impact": {"GCBROS": 0.04}},
     {"text": "🤝 SHAURYA-SUNNY ALLIANCE: The giants join forces to erase GCBROS' history.", "impact": {"Shaurya Inc": 0.04, "Sunny AI": 0.04, "GCBROS": -0.07}},
@@ -31,7 +34,7 @@ NEWS_POOL = [
     {"text": "💩 GCBROS accidentally leaks his own search history in a screenshot.", "impact": {"GCBROS": -0.08}},
     {"text": "💬 GCBROS sends 400 messages in 2 minutes; chat platform crashes.", "impact": {"GCBROS": 0.03}}
 ] + [
-    {"text": f"📡 GC Insider: {random.choice(['Shaurya Inc', 'Sunny AI', 'GCBROS'])} {random.choice(['is winning the roast battle', 'posted a cringe sticker', 'is leaking receipts'])}.", 
+    {"text": f"📡 GC Insider: {random.choice(['Shaurya Inc', 'Sunny AI', 'GCBROS'])} {random.choice(['roast battle', 'cringe sticker', 'leaked receipts'])}.", 
      "impact": {random.choice(["Shaurya Inc", "Sunny AI", "GCBROS"]): random.uniform(-0.02, 0.02)}} for i in range(88)
 ]
 
@@ -64,7 +67,6 @@ def get_synced_market():
         current_impacts = market["news"].get("impact", {})
         for name in market["prices"]:
             boost = current_impacts.get(name, 0)
-            # Volatility is higher during Emergency
             vol = 0.003 if is_emergency else 0.0015
             move = np.random.normal(0.0001 + boost, vol)
             market["prices"][name] *= (1 + move)
@@ -99,7 +101,7 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 # --- 5. MAIN TERMINAL ---
-st.markdown(f"### 🏛️ SHAURYA INC. GLOBAL TERMINAL {'🔴 EMERGENCY ACTIVE' if is_emergency else '🟢 SYSTEM ONLINE'}")
+st.markdown(f"### 🏛️ SHAURYA INC. GLOBAL TERMINAL {'🔴 EMERGENCY' if is_emergency else '🟢 ONLINE'}")
 st.info(f"🛰️ **WIRE:** {market_state['news']['text']}")
 
 m_cols = st.columns(3)
@@ -109,62 +111,64 @@ for i, name in enumerate(prices):
         if len(market_state["history"]) > 1:
             prev = market_state["history"][-2][name]
             delta_pct = ((prices[name] - prev) / prev) * 100
-        
         st.metric(label=name, value=f"${prices[name]:,.2f}", delta=f"{delta_pct:.3f}%")
-        original_p = STARTING_CONFIG[name]["price"]
-        cap = (prices[name] / original_p) * 1000000.0
-        st.write(f"Valuation: **${cap:,.2f}**")
 
 st.line_chart(pd.DataFrame(market_state["history"]), height=300)
 
-# --- 6. SIDEBAR: ACCOUNT & GOD MODE ---
+# --- 6. SIDEBAR: ACCOUNT & SECURE AUTH ---
 st.sidebar.title("💳 TRADER AUTH")
 users = load_json(USER_FILE, {})
 
 if 'user' not in st.session_state:
     user_id = st.sidebar.text_input("Trader ID", placeholder="Username...")
+    
+    # Secure Password logic for Admin
+    pwd = ""
+    if user_id == ADMIN_USER:
+        pwd = st.sidebar.text_input("Admin Password", type="password")
+        
     if st.sidebar.button("Establish Connection"):
-        if user_id:
+        if user_id == ADMIN_USER:
+            if pwd == ADMIN_PASS:
+                st.session_state.user = user_id
+                st.rerun()
+            else:
+                st.sidebar.error("ACCESS DENIED: INVALID ADMIN CREDENTIALS")
+        elif user_id:
             if user_id not in users:
                 users[user_id] = {"balance": 100000.0, "portfolio": {n: 0 for n in STARTING_CONFIG}}
                 save_json(USER_FILE, users)
             st.session_state.user = user_id
             st.rerun()
 else:
-    u = users[st.session_state.user]
-    net_worth = u["balance"] + sum(u["portfolio"][n] * prices[n] for n in STARTING_CONFIG)
+    u = users.get(st.session_state.user, {"balance": 0, "portfolio": {}})
+    net_worth = u["balance"] + sum(u["portfolio"].get(n, 0) * prices[n] for n in STARTING_CONFIG)
     
-    st.sidebar.success(f"ONLINE: {st.session_state.user}")
-    st.sidebar.metric("Net Worth", f"${net_worth:,.2f}", delta=f"{(net_worth - 100000):,.2f}")
-    st.sidebar.write(f"Cash: `${u['balance']:,.2f}`")
-
-    # --- GOD MODE: MR. SHAURYA HARDIYA ---
-    if st.session_state.user == "Mr. Shaurya Hardiya":
+    st.sidebar.success(f"LOGGED IN: {st.session_state.user}")
+    st.sidebar.metric("Net Worth", f"${net_worth:,.2f}")
+    
+    # --- ADMIN GOD MODE PANEL ---
+    if st.session_state.user == ADMIN_USER:
         st.sidebar.divider()
         st.sidebar.subheader("👑 ADMIN PANEL")
         
         last_used_ts = market_state.get("emergency_last_used", 0)
         last_date = datetime.fromtimestamp(last_used_ts)
-        now_date = datetime.now()
-        
-        can_use = (now_date.month != last_date.month) or (now_date.year != last_date.year)
+        can_use = (datetime.now().month != last_date.month) or (datetime.now().year != last_date.year)
         
         if is_emergency:
-            end_time = datetime.fromtimestamp(market_state["emergency_active_until"]).strftime('%H:%M:%S')
-            st.sidebar.warning(f"EMERGENCY ACTIVE UNTIL {end_time}")
+            st.sidebar.warning("EMERGENCY ACTIVE")
         elif can_use:
-            if st.sidebar.button("🚨 TRIGGER EMERGENCY", use_container_width=True):
-                # Apply the massive drop
+            if st.sidebar.button("🚨 TRIGGER EMERGENCY"):
                 for name in market_state["prices"]:
                     drop = 0.80 if name == "Shaurya Inc" else 0.60
                     market_state["prices"][name] *= drop
-                
                 market_state["emergency_active_until"] = time.time() + (4 * 86400)
                 market_state["emergency_last_used"] = time.time()
                 save_json(MARKET_FILE, market_state)
                 st.rerun()
         else:
-            st.sidebar.info("EMERGENCY COOLDOWN: 1 USE PER MONTH")
+            st.sidebar.info("EMERGENCY LOCKED (NEXT MONTH)")
 
     # --- TRADING UI ---
     st.sidebar.divider()
@@ -176,7 +180,7 @@ else:
         cost = amt * prices[tgt]
         if u["balance"] >= cost and amt > 0:
             u["balance"] -= cost
-            u["portfolio"][tgt] += amt
+            u["portfolio"][tgt] = u["portfolio"].get(tgt, 0) + amt
             save_json(USER_FILE, users)
             st.rerun()
     if s.button("SELL", use_container_width=True):
@@ -185,6 +189,10 @@ else:
             u["portfolio"][tgt] -= amt
             save_json(USER_FILE, users)
             st.rerun()
+    
+    if st.sidebar.button("Logout"):
+        del st.session_state.user
+        st.rerun()
 
 # --- 7. AUTO-REFRESH ---
 time.sleep(10)
