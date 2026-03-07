@@ -14,17 +14,16 @@ ADMIN_USER = "Mr. Shaurya Hardiya"
 ADMIN_PASS = "ShauryaBoomBoom"
 
 STARTING_CONFIG = {
-    "Shaurya Inc": {"price": 100.0, "proxy": "Nvidia"},
-    "Sunny AI": {"price": 150.0, "proxy": "Google"},
-    "GCBROS": {"price": 50.0, "proxy": "Microsoft"}
+    "Shaurya Inc": {"price": 100.0, "proxy": "Nvidia", "base_cap": 1000000.0},
+    "Sunny AI": {"price": 150.0, "proxy": "Google", "base_cap": 1000000.0},
+    "GCBROS": {"price": 50.0, "proxy": "Microsoft", "base_cap": 1000000.0}
 }
 
 # --- 2. CORE DATA FUNCTIONS ---
 def load_json(file, default):
     if os.path.exists(file):
         try:
-            with open(file, "r") as f:
-                with open(file, "r") as r: return json.load(r)
+            with open(file, "r") as r: return json.load(r)
         except: return default
     return default
 
@@ -56,7 +55,6 @@ def update_market_logic():
         market["history"].append(market["prices"].copy())
         if len(market["history"]) > 60: market["history"].pop(0)
         
-        # News Logic
         if random.random() < 0.30:
             if is_emergency:
                 market["news"] = {"text": "🚨 EMERGENCY: HARDIYA PROTOCOL ACTIVE.", "impact": {}}
@@ -68,7 +66,7 @@ def update_market_logic():
     
     return market, is_emergency
 
-# --- 3. UI INITIALIZATION ---
+# --- 3. UI SETUP ---
 st.set_page_config(page_title="Shaurya Terminal", layout="wide")
 market_state, is_emergency = update_market_logic()
 prices = market_state["prices"]
@@ -80,12 +78,21 @@ st.info(f"🛰️ **WIRE:** {market_state['news']['text']}")
 cols = st.columns(3)
 for i, name in enumerate(prices):
     with cols[i]:
+        # Calculate Delta
         hist = market_state["history"]
         delta = 0
         if len(hist) > 1:
             prev = hist[-2][name]
             delta = ((prices[name] - prev) / prev) * 100
+        
+        # Display Price Metric
         st.metric(name, f"${prices[name]:,.2f}", f"{delta:.3f}%")
+        
+        # --- NEW: VALUATION CALCULATION ---
+        # Calculation: (Current Price / Starting Price) * Base Cap
+        original_price = STARTING_CONFIG[name]["price"]
+        current_cap = (prices[name] / original_price) * STARTING_CONFIG[name]["base_cap"]
+        st.write(f"Valuation: **${current_cap:,.2f}**")
 
 if market_state["history"]:
     st.line_chart(pd.DataFrame(market_state["history"]), height=250)
@@ -113,7 +120,6 @@ if 'user' not in st.session_state:
         else:
             st.sidebar.error("Invalid Login")
 else:
-    # RE-LOAD USERS TO GET FRESH DATA BEFORE TRADE
     users = load_json(USER_FILE, {})
     current_user = st.session_state.user
     u_data = users[current_user]
@@ -121,9 +127,16 @@ else:
     st.sidebar.success(f"User: {current_user}")
     
     # CALCULATE NET WORTH
-    total_port = sum(u_data["portfolio"].get(n, 0) * prices[n] for n in STARTING_CONFIG)
-    st.sidebar.metric("Net Worth", f"${u_data['balance'] + total_port:,.2f}")
+    total_port_value = sum(u_data["portfolio"].get(n, 0) * prices[n] for n in STARTING_CONFIG)
+    st.sidebar.metric("Net Worth", f"${u_data['balance'] + total_port_value:,.2f}")
     st.sidebar.write(f"Available Cash: `${u_data['balance']:,.2f}`")
+
+    # --- NEW: PORTFOLIO BREAKDOWN ---
+    st.sidebar.divider()
+    st.sidebar.subheader("📦 Your Holdings")
+    for name in STARTING_CONFIG:
+        qty = u_data["portfolio"].get(name, 0)
+        st.sidebar.write(f"{name}: **{qty} shares**")
 
     # ADMIN PANEL
     if current_user == ADMIN_USER:
@@ -137,30 +150,29 @@ else:
 
     # TRADING SECTION
     st.sidebar.divider()
-    asset = st.sidebar.selectbox("Asset", list(STARTING_CONFIG.keys()))
-    qty = st.sidebar.number_input("Quantity", min_value=0, step=1, value=0)
+    asset = st.sidebar.selectbox("Select Asset to Trade", list(STARTING_CONFIG.keys()))
+    qty_input = st.sidebar.number_input("Quantity", min_value=0, step=1, value=0)
     
-    # IMPORTANT: We use a form or separate buttons with explicit saving
     b_col, s_col = st.sidebar.columns(2)
     
     if b_col.button("BUY"):
-        cost = qty * prices[asset]
-        if qty > 0 and u_data["balance"] >= cost:
+        cost = qty_input * prices[asset]
+        if qty_input > 0 and u_data["balance"] >= cost:
             users[current_user]["balance"] -= cost
-            users[current_user]["portfolio"][asset] += qty
+            users[current_user]["portfolio"][asset] = users[current_user]["portfolio"].get(asset, 0) + qty_input
             save_json(USER_FILE, users)
-            st.toast(f"Bought {qty} {asset}")
+            st.toast(f"Bought {qty_input} {asset}")
             time.sleep(0.5)
             st.rerun()
         else:
             st.sidebar.error("Trade Failed")
 
     if s_col.button("SELL"):
-        if qty > 0 and u_data["portfolio"].get(asset, 0) >= qty:
-            users[current_user]["balance"] += (qty * prices[asset])
-            users[current_user]["portfolio"][asset] -= qty
+        if qty_input > 0 and u_data["portfolio"].get(asset, 0) >= qty_input:
+            users[current_user]["balance"] += (qty_input * prices[asset])
+            users[current_user]["portfolio"][asset] -= qty_input
             save_json(USER_FILE, users)
-            st.toast(f"Sold {qty} {asset}")
+            st.toast(f"Sold {qty_input} {asset}")
             time.sleep(0.5)
             st.rerun()
         else:
@@ -171,6 +183,5 @@ else:
         st.rerun()
 
 # --- 6. THE HEARTBEAT ---
-# We use a short sleep and rerun to keep the market moving
 time.sleep(5)
 st.rerun()
