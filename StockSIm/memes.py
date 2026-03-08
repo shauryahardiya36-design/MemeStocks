@@ -68,38 +68,45 @@ def update_market_logic():
     })
     
     now = time.time()
+    # FORCE CHECK: If 'now' is less than the saved end time, it IS still a bull run.
     is_emergency = now < market.get("emergency_active_until", 0)
     is_bull = now < market.get("bull_active_until", 0)
 
     if now - market["last_update"] >= 10:
         current_month = datetime.now().month
         
+        # Trigger Bull Run if conditions met
         if not is_bull and not is_emergency and market.get("bull_last_month") != current_month:
             if random.random() < 0.01: 
-                market["bull_active_until"] = now + (5 * 86400)
+                market["bull_active_until"] = now + (5 * 86400) # Full 5 Days
                 market["bull_last_month"] = current_month
                 is_bull = True
                 for name in market["prices"]:
-                    market["prices"][name] *= 1.25
-                market["news"] = {"text": "🚀 UNKNOWN SIGNAL: A GLOBAL BULL RUN HAS BEGUN! +25% GAINS DETECTED.", "impact": {}}
+                    market["prices"][name] *= 1.25 
+                market["news"] = {"text": "🚀 GLOBAL BULL RUN DETECTED! +25% GAINS INJECTED.", "impact": {}}
 
-        current_impacts = market["news"].get("impact", {})
+        # Price Movement Logic
         for name in market["prices"]:
-            boost = current_impacts.get(name, 0)
-            if is_bull: move = np.random.normal(0.0012, 0.001) 
+            if is_bull:
+                # Bull run move: Higher mean, lower volatility (steady climb)
+                move = np.random.normal(0.0015, 0.0008) 
+            elif is_emergency:
+                # Emergency move: Downward trend
+                move = np.random.normal(-0.002, 0.004)
             else:
-                vol = 0.004 if is_emergency else 0.0018
-                move = np.random.normal(0.0001 + boost, vol)
+                # Normal move
+                move = np.random.normal(0.0001, 0.0018)
             market["prices"][name] *= (1 + move)
             
         market["history"].append(market["prices"].copy())
         if len(market["history"]) > 60: market["history"].pop(0)
         
-        if random.random() < 0.30:
-            if is_emergency: market["news"] = {"text": "🚨 EMERGENCY: HARDIYA PROTOCOL ACTIVE.", "impact": {}}
-            elif is_bull: market["news"] = {"text": "📈 BULL RUN: Optimism is high! Prices are pumping.", "impact": {}}
-            else: market["news"] = {"text": "💬 GC chatter: New screenshots surfacing...", "impact": {}}
-        
+        # Force News Update during Bull Run
+        if is_bull:
+            market["news"]["text"] = "📈 BULL RUN ACTIVE: Markets are surging!"
+        elif is_emergency:
+            market["news"]["text"] = "🚨 EMERGENCY PROTOCOL: Market under duress."
+            
         market["last_update"] = now
         save_json(MARKET_FILE, market)
     
