@@ -164,10 +164,10 @@ if 'user' not in st.session_state:
 else:
     curr = st.session_state.user
     
-    # 6.1 CEO AUTH BYPASS (Prevent KeyError)
+    # 6.1 CEO AUTH BYPASS (Standardized to 100k)
     if curr == ADMIN_USER:
         u_data = {
-            "balance": 999999999.0, 
+            "balance": 100000.0, # Back to the starting line
             "portfolio": {n: 0 for n in STARTING_CONFIG},
             "is_ghosted": False,
             "is_kitten": False
