@@ -137,7 +137,7 @@ elif is_bull: st.markdown("<style>.stApp { background-color: #051a05; }</style>"
 
 # --- 5. MAIN DASHBOARD ---
 status_txt = "🔴 EMERGENCY" if is_emergency else ("🚀 BULL RUN" if is_bull else "🟢 ONLINE")
-st.title(f"🏛️ Shaurya Mainframe - {status_txt}")
+st.title(f"🏛️ MEMECONOMY TRADING PLATFORM - {status_txt}")
 st.info(f"🛰️ **WIRE:** {market_state['news']['text']}")
 
 cols = st.columns(3)
