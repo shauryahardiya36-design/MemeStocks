@@ -215,6 +215,14 @@ else:
                 for n in market_state["prices"]: market_state["prices"][n] *= 1.25
                 save_json(MARKET_FILE, market_state)
                 st.rerun()
+                
+            # Manual Stop Bull Run
+            if is_bull:
+                if st.button("🛑 TERMINATE BULL RUN"):
+                    market_state["bull_active_until"] = 0
+                    market_state["news"]["text"] = "📉 BULL RUN TERMINATED BY CEO MANDATE."
+                    save_json(MARKET_FILE, market_state)
+                    st.rerun()
 
             # Taxation
             st.divider()
