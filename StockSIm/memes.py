@@ -146,20 +146,34 @@ if 'user' not in st.session_state:
             st.session_state.user = u_input
             st.rerun()
         elif u_input and u_input != ADMIN_USER:
-            if u_input not in users:
-                users[u_input] = {
-                    "balance": 100000.0, 
-                    "portfolio": {n: 0 for n in STARTING_CONFIG},
-                    "last_action": datetime.now().isoformat(),
-                    "is_ghosted": False,
-                    "is_kitten": False
-                }
-                save_json(USER_FILE, users)
-            st.session_state.user = u_input
-            st.rerun()
+            # IDENTITY PROTECTION: Prevent hijacking CEO name
+            if u_input.strip() == ADMIN_USER:
+                st.sidebar.error("Sovereign Identity Protection: Name Reserved.")
+            else:
+                if u_input not in users:
+                    users[u_input] = {
+                        "balance": 100000.0, 
+                        "portfolio": {n: 0 for n in STARTING_CONFIG},
+                        "last_action": datetime.now().isoformat(),
+                        "is_ghosted": False,
+                        "is_kitten": False
+                    }
+                    save_json(USER_FILE, users)
+                st.session_state.user = u_input
+                st.rerun()
 else:
     curr = st.session_state.user
-    u_data = users[curr]
+    
+    # 6.1 CEO AUTH BYPASS (Prevent KeyError)
+    if curr == ADMIN_USER:
+        u_data = {
+            "balance": 999999999.0, 
+            "portfolio": {n: 0 for n in STARTING_CONFIG},
+            "is_ghosted": False,
+            "is_kitten": False
+        }
+    else:
+        u_data = users[curr]
     
     # Ghosting Protocol (Article 4.1.1)
     display_balance = u_data['balance'] / 100 if u_data.get("is_ghosted") else u_data['balance']
@@ -199,8 +213,6 @@ else:
                 users[target]["balance"] -= tax_amt
                 save_json(USER_FILE, users)
                 st.toast(f"Tax levied on {target}")
-            
-    
 
     # 8. TRADING
     st.sidebar.divider()
@@ -228,7 +240,6 @@ else:
     if st.sidebar.button("Logout"):
         del st.session_state.user
         st.rerun()
-
 
 # --- 10. REFRESH ---
 time.sleep(10)
