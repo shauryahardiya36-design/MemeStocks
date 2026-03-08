@@ -40,13 +40,9 @@ def apply_system_rules(users):
     updated = False
     for uid, d in users.items():
         if uid == ADMIN_USER: continue
-        
-        # 3.1 Sovereign Safety Net (Article 5.7)
         if d.get("balance", 0) < 1000:
             users[uid]["balance"] = 1000.0
             updated = True
-            
-        # 3.2 Stagnation Decay (Article 4.3)
         last_act_str = d.get("last_action")
         if last_act_str:
             last_act = datetime.fromisoformat(last_act_str)
@@ -56,14 +52,11 @@ def apply_system_rules(users):
                 users[uid]["balance"] -= decay
                 users[uid]["last_action"] = now.isoformat()
                 updated = True
-    
     if updated: save_json(USER_FILE, users)
     return users
 
 def update_market_logic():
-    # 1. Load state - Strictly avoid defaulting to STARTING_CONFIG if file exists
     market = load_json(MARKET_FILE, None)
-    
     if market is None or "prices" not in market:
         market = {
             "prices": {n: STARTING_CONFIG[n]["price"] for n in STARTING_CONFIG},
@@ -73,47 +66,59 @@ def update_market_logic():
             "emergency_active_until": 0,
             "emergency_last_used": 0,
             "bull_active_until": 0,
-            "bull_last_month": 0
+            "bull_last_month": 0,
+            "stimulus_fund": 0.0,
+            "stimulus_target": 1000000.0
         }
     
     now = time.time()
     is_emergency = now < market.get("emergency_active_until", 0)
     is_bull = now < market.get("bull_active_until", 0)
 
-    # 2. Market Pulse (Every 10 seconds)
     if now - market["last_update"] >= 10:
         current_month = datetime.now().month
         
-        # Random Bull Run Trigger (1% chance per pulse if not active)
+        # --- BULL RUN TRIGGER LOGIC ---
+        triggered = False
+        trigger_msg = ""
+
+        # Path A: Natural Luck (1% chance per pulse, once a month)
         if not is_bull and not is_emergency and market.get("bull_last_month") != current_month:
             if random.random() < 0.01: 
-                market["bull_active_until"] = now + (5 * 86400) # 5 Day Duration
                 market["bull_last_month"] = current_month
-                is_bull = True
-                for name in market["prices"]:
-                    market["prices"][name] *= 1.25 # Instant 25% Pump
-                market["news"] = {"text": "🚀 GLOBAL BULL RUN DETECTED! Markets surging.", "impact": {}}
+                triggered = True
+                trigger_msg = "🚀 NATURAL PHENOMENON: A Global Bull Run has spontaneously begun!"
 
-        # Price Evolution Logic
+        # Path B: Community Stimulus (Money-based)
+        stim_fund = market.get("stimulus_fund", 0)
+        stim_target = market.get("stimulus_target", 1000000.0)
+        if not is_bull and not is_emergency and stim_fund >= stim_target:
+            market["stimulus_fund"] = 0 # Reset pot
+            triggered = True
+            trigger_msg = "📢 STIMULUS TARGET REACHED: The community has funded a market pump!"
+
+        if triggered:
+            market["bull_active_until"] = now + (5 * 86400)
+            is_bull = True
+            for name in market["prices"]:
+                market["prices"][name] *= 1.25
+            market["news"] = {"text": trigger_msg, "impact": {}}
+
+        # Price Evolution
         for name in market["prices"]:
             if is_bull:
-                move = np.random.normal(0.0018, 0.0012) # Strong Growth
+                move = np.random.normal(0.0018, 0.0012)
             elif is_emergency:
-                move = np.random.normal(-0.0025, 0.004) # Rapid Decay
+                move = np.random.normal(-0.0025, 0.004)
             else:
-                move = np.random.normal(0.0001, 0.0018) # Normal Volatility
-            
+                move = np.random.normal(0.0001, 0.0018)
             market["prices"][name] *= (1 + move)
             
-        # Update History
         market["history"].append(market["prices"].copy())
         if len(market["history"]) > 60: market["history"].pop(0)
         
-        # Sticky News Logic
-        if is_bull: market["news"]["text"] = "🚀 BULL RUN: Optimism is at an all-time high."
-        elif is_emergency: market["news"]["text"] = "🚨 EMERGENCY: Hardiya Protocol enforcing correction."
-        elif random.random() < 0.1:
-            market["news"]["text"] = random.choice(["💬 GC chatter: New screenshots surfacing...", "📈 Market showing stable resistance.", "🔍 Analysts predict a volatile week."])
+        if is_bull: market["news"]["text"] = "🚀 BULL RUN ACTIVE: To the moon!"
+        elif is_emergency: market["news"]["text"] = "🚨 EMERGENCY: Hardiya Protocol Active."
         
         market["last_update"] = now
         save_json(MARKET_FILE, market)
@@ -127,16 +132,14 @@ prices = market_state["prices"]
 users = load_json(USER_FILE, {})
 users = apply_system_rules(users)
 
-# Dynamic Theming
 if is_emergency: st.markdown("<style>.stApp { background-color: #2b0505; }</style>", unsafe_allow_html=True)
 elif is_bull: st.markdown("<style>.stApp { background-color: #051a05; }</style>", unsafe_allow_html=True)
 
 # --- 5. MAIN DASHBOARD ---
 status_txt = "🔴 EMERGENCY" if is_emergency else ("🚀 BULL RUN" if is_bull else "🟢 ONLINE")
-st.title(f"🏛️ Memeconomy Trading Platform - {status_txt}")
+st.title(f"🏛️ Shaurya Mainframe - {status_txt}")
 st.info(f"🛰️ **WIRE:** {market_state['news']['text']}")
 
-# Price Cards
 cols = st.columns(3)
 for i, name in enumerate(prices):
     with cols[i]:
@@ -146,8 +149,6 @@ for i, name in enumerate(prices):
             prev = hist[-2][name]
             delta = ((prices[name] - prev) / prev) * 100
         st.metric(name, f"${prices[name]:,.2f}", f"{delta:.3f}%")
-        
-        # Valuation math
         orig = STARTING_CONFIG[name]["price"]
         v_cap = (prices[name] / orig) * STARTING_CONFIG[name]["base_cap"]
         st.write(f"Valuation: **${v_cap:,.2f}**")
@@ -178,8 +179,6 @@ if 'user' not in st.session_state:
 else:
     curr = st.session_state.user
     u_data = users[curr]
-    
-    # Ghosting check
     display_balance = u_data['balance'] / 100 if u_data.get("is_ghosted") else u_data['balance']
     
     st.sidebar.success(f"ONLINE: {curr}")
@@ -198,33 +197,15 @@ else:
     if curr == ADMIN_USER:
         st.sidebar.divider()
         with st.sidebar.expander("👑 CEO CONTROL"):
-            # Emergency
             last_e = datetime.fromtimestamp(market_state.get("emergency_last_used", 0))
             can_e = (datetime.now().month != last_e.month) or (datetime.now().year != last_e.year)
             if st.button("🚨 TRIGGER EMERGENCY", disabled=not can_e):
-                for n in market_state["prices"]:
-                    market_state["prices"][n] *= 0.7
+                for n in market_state["prices"]: market_state["prices"][n] *= 0.7
                 market_state["emergency_active_until"] = time.time() + (4 * 86400)
                 market_state["emergency_last_used"] = time.time()
                 save_json(MARKET_FILE, market_state)
                 st.rerun()
-            
-            # Manual Bull Run
-            if st.button("🚀 FORCE BULL RUN"):
-                market_state["bull_active_until"] = time.time() + (5 * 86400)
-                for n in market_state["prices"]: market_state["prices"][n] *= 1.25
-                save_json(MARKET_FILE, market_state)
-                st.rerun()
 
-            # Manual Stop Bull Run
-            if is_bull:
-                if st.button("🛑 TERMINATE BULL RUN"):
-                    market_state["bull_active_until"] = 0
-                    market_state["news"]["text"] = "📉 BULL RUN TERMINATED BY CEO MANDATE."
-                    save_json(MARKET_FILE, market_state)
-                    st.rerun()
-
-            # Taxation
             st.divider()
             target = st.selectbox("Select Target", [u for u in users if u != ADMIN_USER])
             tax_amt = st.number_input("Tax ($)", min_value=0.0)
@@ -233,7 +214,7 @@ else:
                 save_json(USER_FILE, users)
                 st.toast(f"Tax levied on {target}")
 
-    # 8. TRADING ENGINE
+    # 8. TRADING & STIMULUS
     st.sidebar.divider()
     asset = st.sidebar.selectbox("Trade Asset", list(STARTING_CONFIG.keys()))
     amt = st.sidebar.number_input("Amount", min_value=0, step=1)
@@ -256,10 +237,25 @@ else:
             save_json(USER_FILE, users)
             st.rerun()
 
+    st.sidebar.divider()
+    st.sidebar.subheader("🏦 Stimulus Fund")
+    s_fund = market_state.get("stimulus_fund", 0)
+    s_target = market_state.get("stimulus_target", 1000000.0)
+    st.sidebar.progress(min(s_fund/s_target, 1.0))
+    st.sidebar.write(f"`${s_fund:,.2f}` / `${s_target:,.2f}`")
+    
+    donation = st.sidebar.number_input("Donate to Bull Run", min_value=0.0, step=5000.0)
+    if st.sidebar.button("DONATE"):
+        if u_data["balance"] >= donation and donation > 0:
+            users[curr]["balance"] -= donation
+            market_state["stimulus_fund"] += donation
+            save_json(USER_FILE, users)
+            save_json(MARKET_FILE, market_state)
+            st.rerun()
+
     if st.sidebar.button("Logout"):
         del st.session_state.user
         st.rerun()
 
-# 9. REFRESH
 time.sleep(10)
 st.rerun()
