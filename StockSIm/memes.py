@@ -38,19 +38,19 @@ def apply_system_rules(users):
     for uid, d in users.items():
         if uid == ADMIN_USER: continue
         
-        # 3.1 Sovereign Safety Net (Article 5.7)
         if d.get("balance", 0) < 1000:
             users[uid]["balance"] = 1000.0
             updated = True
             
-        # 3.2 Stagnation Decay (Article 4.3)
-        last_act = datetime.fromisoformat(d.get("last_action", now.isoformat()))
-        if (now - last_act).total_seconds() > (72 * 3600):
-            days_stagnant = (now - last_act).total_seconds() / 86400
-            decay = d["balance"] * (0.02 * days_stagnant)
-            users[uid]["balance"] -= decay
-            users[uid]["last_action"] = now.isoformat() # Reset clock after taxing
-            updated = True
+        last_act_str = d.get("last_action")
+        if last_act_str:
+            last_act = datetime.fromisoformat(last_act_str)
+            if (now - last_act).total_seconds() > (72 * 3600):
+                days_stagnant = (now - last_act).total_seconds() / 86400
+                decay = d["balance"] * (0.02 * days_stagnant)
+                users[uid]["balance"] -= decay
+                users[uid]["last_action"] = now.isoformat()
+                updated = True
     
     if updated: save_json(USER_FILE, users)
     return users
@@ -142,40 +142,25 @@ if 'user' not in st.session_state:
     u_input = st.sidebar.text_input("Trader ID")
     pwd_input = st.sidebar.text_input("Admin Password", type="password") if u_input == ADMIN_USER else ""
     if st.sidebar.button("Connect"):
-        if u_input == ADMIN_USER and pwd_input == ADMIN_PASS:
-            st.session_state.user = u_input
-            st.rerun()
-        elif u_input and u_input != ADMIN_USER:
-            # IDENTITY PROTECTION: Prevent hijacking CEO name
-            if u_input.strip() == ADMIN_USER:
-                st.sidebar.error("Sovereign Identity Protection: Name Reserved.")
-            else:
-                if u_input not in users:
-                    users[u_input] = {
-                        "balance": 100000.0, 
-                        "portfolio": {n: 0 for n in STARTING_CONFIG},
-                        "last_action": datetime.now().isoformat(),
-                        "is_ghosted": False,
-                        "is_kitten": False
-                    }
+        if u_input == ADMIN_USER:
+            if pwd_input == ADMIN_PASS:
+                if ADMIN_USER not in users:
+                    users[ADMIN_USER] = {"balance": 100000.0, "portfolio": {n: 0 for n in STARTING_CONFIG}, "last_action": datetime.now().isoformat(), "is_ghosted": False, "is_kitten": False}
                     save_json(USER_FILE, users)
                 st.session_state.user = u_input
                 st.rerun()
+            else:
+                st.sidebar.error("Invalid Admin Credentials")
+        elif u_input:
+            if u_input not in users:
+                users[u_input] = {"balance": 100000.0, "portfolio": {n: 0 for n in STARTING_CONFIG}, "last_action": datetime.now().isoformat(), "is_ghosted": False, "is_kitten": False}
+                save_json(USER_FILE, users)
+            st.session_state.user = u_input
+            st.rerun()
 else:
     curr = st.session_state.user
+    u_data = users[curr]
     
-    # 6.1 CEO AUTH BYPASS (Standardized to 100k)
-    if curr == ADMIN_USER:
-        u_data = {
-            "balance": 100000.0, # Back to the starting line
-            "portfolio": {n: 0 for n in STARTING_CONFIG},
-            "is_ghosted": False,
-            "is_kitten": False
-        }
-    else:
-        u_data = users[curr]
-    
-    # Ghosting Protocol (Article 4.1.1)
     display_balance = u_data['balance'] / 100 if u_data.get("is_ghosted") else u_data['balance']
     
     st.sidebar.success(f"ONLINE: {curr}")
@@ -190,11 +175,9 @@ else:
     st.sidebar.metric("Net Worth", f"${display_balance + p_val:,.2f}")
     st.sidebar.write(f"Cash: `${display_balance:,.2f}`")
 
-    # 7. ADMIN GOD MODE (SHAURYA ONLY)
     if curr == ADMIN_USER:
         st.sidebar.divider()
         with st.sidebar.expander("👑 CEO CONTROL PANEL"):
-            # Emergency Trigger
             last_e = datetime.fromtimestamp(market_state.get("emergency_last_used", 0))
             can_e = (datetime.now().month != last_e.month) or (datetime.now().year != last_e.year)
             if st.button("🚨 TRIGGER EMERGENCY", disabled=not can_e):
@@ -205,7 +188,6 @@ else:
                 save_json(MARKET_FILE, market_state)
                 st.rerun()
 
-            # Audit & Tax (Article 4.2 & 6.2)
             st.divider()
             target = st.selectbox("Select Target", [u for u in users if u != ADMIN_USER])
             tax_amt = st.number_input("Tax Amount ($)", min_value=0.0)
@@ -214,7 +196,6 @@ else:
                 save_json(USER_FILE, users)
                 st.toast(f"Tax levied on {target}")
 
-    # 8. TRADING
     st.sidebar.divider()
     asset = st.sidebar.selectbox("Trade Asset", list(STARTING_CONFIG.keys()))
     amt = st.sidebar.number_input("Amount", min_value=0, step=1)
@@ -241,6 +222,5 @@ else:
         del st.session_state.user
         st.rerun()
 
-# --- 10. REFRESH ---
 time.sleep(10)
 st.rerun()
