@@ -197,10 +197,18 @@ else:
     if curr == ADMIN_USER:
         st.sidebar.divider()
         with st.sidebar.expander("👑 CEO CONTROL"):
+            # Emergency Logic
             last_e = datetime.fromtimestamp(market_state.get("emergency_last_used", 0))
             can_e = (datetime.now().month != last_e.month) or (datetime.now().year != last_e.year)
+            
             if st.button("🚨 TRIGGER EMERGENCY", disabled=not can_e):
-                for n in market_state["prices"]: market_state["prices"][n] *= 0.7
+                for n in market_state["prices"]:
+                    # THE SPLIT: Shaurya Inc drops 20%, others drop 40%
+                    if n == "Shaurya Inc":
+                        market_state["prices"][n] *= 0.8
+                    else:
+                        market_state["prices"][n] *= 0.6
+                
                 market_state["emergency_active_until"] = time.time() + (4 * 86400)
                 market_state["emergency_last_used"] = time.time()
                 save_json(MARKET_FILE, market_state)
