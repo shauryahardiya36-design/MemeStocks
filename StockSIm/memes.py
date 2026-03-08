@@ -56,62 +56,52 @@ def apply_system_rules(users):
     return users
 
 def update_market_logic():
-    market = load_json(MARKET_FILE, {
-        "prices": {n: STARTING_CONFIG[n]["price"] for n in STARTING_CONFIG},
-        "history": [],
-        "news": {"text": "SYSTEM ONLINE", "impact": {}},
-        "last_update": 0,
-        "emergency_active_until": 0,
-        "emergency_last_used": 0,
-        "bull_active_until": 0,
-        "bull_last_month": 0
-    })
+    # 1. Try to load existing state
+    market = load_json(MARKET_FILE, None)
+    
+    # 2. Only use STARTING_CONFIG if the file is EMPTY or MISSING
+    if market is None:
+        market = {
+            "prices": {n: STARTING_CONFIG[n]["price"] for n in STARTING_CONFIG},
+            "history": [],
+            "news": {"text": "SYSTEM ONLINE", "impact": {}},
+            "last_update": 0,
+            "emergency_active_until": 0,
+            "emergency_last_used": 0,
+            "bull_active_until": 0,
+            "bull_last_month": 0
+        }
     
     now = time.time()
-    # FORCE CHECK: If 'now' is less than the saved end time, it IS still a bull run.
     is_emergency = now < market.get("emergency_active_until", 0)
     is_bull = now < market.get("bull_active_until", 0)
 
     if now - market["last_update"] >= 10:
-        current_month = datetime.now().month
-        
-        # Trigger Bull Run if conditions met
-        if not is_bull and not is_emergency and market.get("bull_last_month") != current_month:
-            if random.random() < 0.01: 
-                market["bull_active_until"] = now + (5 * 86400) # Full 5 Days
-                market["bull_last_month"] = current_month
-                is_bull = True
-                for name in market["prices"]:
-                    market["prices"][name] *= 1.25 
-                market["news"] = {"text": "🚀 GLOBAL BULL RUN DETECTED! +25% GAINS INJECTED.", "impact": {}}
-
-        # Price Movement Logic
+        # --- PRICE MOVEMENT CALCULATION ---
+        # We use the prices currently in 'market', NOT Starting Config
         for name in market["prices"]:
             if is_bull:
-                # Bull run move: Higher mean, lower volatility (steady climb)
-                move = np.random.normal(0.0015, 0.0008) 
+                move = np.random.normal(0.0015, 0.001) # Aggressive Bull Growth
             elif is_emergency:
-                # Emergency move: Downward trend
-                move = np.random.normal(-0.002, 0.004)
+                move = np.random.normal(-0.002, 0.004) # Emergency Crash
             else:
-                # Normal move
-                move = np.random.normal(0.0001, 0.0018)
+                move = np.random.normal(0.0001, 0.0018) # Normal Wiggle
+            
             market["prices"][name] *= (1 + move)
             
         market["history"].append(market["prices"].copy())
         if len(market["history"]) > 60: market["history"].pop(0)
         
-        # Force News Update during Bull Run
+        # --- STICKY NEWS ---
         if is_bull:
-            market["news"]["text"] = "📈 BULL RUN ACTIVE: Markets are surging!"
+            market["news"]["text"] = "🚀 BULL RUN: Prices are skyrocketing!"
         elif is_emergency:
-            market["news"]["text"] = "🚨 EMERGENCY PROTOCOL: Market under duress."
-            
+            market["news"]["text"] = "🚨 EMERGENCY: Market Correction in progress."
+        
         market["last_update"] = now
         save_json(MARKET_FILE, market)
     
     return market, is_emergency, is_bull
-
 # --- 4. UI SETUP ---
 st.set_page_config(page_title="Memeconomy Trading Platform", layout="wide")
 market_state, is_emergency, is_bull = update_market_logic()
