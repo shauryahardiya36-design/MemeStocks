@@ -133,7 +133,7 @@ elif is_bull: st.markdown("<style>.stApp { background-color: #051a05; }</style>"
 
 # --- 5. MAIN DASHBOARD ---
 status_txt = "🔴 EMERGENCY" if is_emergency else ("🚀 BULL RUN" if is_bull else "🟢 ONLINE")
-st.title(f"🏛️ Shaurya Mainframe - {status_txt}")
+st.title(f"🏛️ Memeconomy Trading Platform - {status_txt}")
 st.info(f"🛰️ **WIRE:** {market_state['news']['text']}")
 
 # Price Cards
@@ -215,7 +215,7 @@ else:
                 for n in market_state["prices"]: market_state["prices"][n] *= 1.25
                 save_json(MARKET_FILE, market_state)
                 st.rerun()
-                
+
             # Manual Stop Bull Run
             if is_bull:
                 if st.button("🛑 TERMINATE BULL RUN"):
