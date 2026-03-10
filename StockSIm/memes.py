@@ -104,26 +104,30 @@ def update_market_logic():
                 market["prices"][name] *= 1.25
             market["news"] = {"text": trigger_msg, "impact": {}}
 
-        # Price Evolution
+        # Price Evolution - High Volatility & Gravity Patch
         for name in market["prices"]:
+            current_price = market["prices"][name]
+            
+            # --- GRAVITY MECHANIC ---
+            # As price rises, the chance of a natural dip increases
+            gravity = 0
+            if current_price > 500:
+                gravity = -0.0008 # Subtle pull
+            if current_price > 800:
+                gravity = -0.003  # Heavy pull (The Bubble Phase)
+            
             if is_bull:
-                move = np.random.normal(0.0018, 0.0012)
+                move = np.random.normal(0.002, 0.001)
             elif is_emergency:
-                move = np.random.normal(-0.0025, 0.004)
+                move = np.random.normal(-0.006, 0.01) # Harder crashes
             else:
-                move = np.random.normal(0.0001, 0.0018)
+                # Normal market now includes gravity pull
+                move = np.random.normal(0.0001 + gravity, 0.0025) 
+            
             market["prices"][name] *= (1 + move)
             
-        market["history"].append(market["prices"].copy())
-        if len(market["history"]) > 60: market["history"].pop(0)
-        
-        if is_bull: market["news"]["text"] = "🚀 BULL RUN ACTIVE: To the moon!"
-        elif is_emergency: market["news"]["text"] = "🚨 EMERGENCY: Hardiya Protocol Active."
-        
-        market["last_update"] = now
-        save_json(MARKET_FILE, market)
-    
-    return market, is_emergency, is_bull
+            # Safety Floor: Don't let stocks hit $0 unless you say so
+            if market["prices"][name] < 1.0: market["prices"][name] = 1.0
 
 # --- 4. UI SETUP ---
 st.set_page_config(page_title="Memeconomy Terminal", layout="wide")
